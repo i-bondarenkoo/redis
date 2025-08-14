@@ -4,6 +4,7 @@ from schemas.singer import CreateSinger, ResponseSinger, UpdateSinger
 from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
 import crud
+from services.redis_service import create_singer_and_cache
 
 router = APIRouter(
     prefix="/singers",
@@ -18,7 +19,7 @@ async def create_singer(
     ],
     session: AsyncSession = Depends(get_session),
 ):
-    return await crud.create_singer_crud(singer_in=singer_in, session=session)
+    return await create_singer_and_cache(singer_in=singer_in, session=session)
 
 
 @router.get("/{singer_id}", response_model=ResponseSinger)
@@ -71,6 +72,6 @@ async def delete_singer(
     singer = await crud.delete_singer_crud(singer_id=singer_id, session=session)
     if singer is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Певец не найден"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
         )
     return singer
