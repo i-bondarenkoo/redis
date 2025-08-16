@@ -25,14 +25,14 @@ async def get_list_singer_crud(session: AsyncSession, start: int = 0, stop: int 
 
 
 async def update_singer_partial_crud(
-    singer: UpdateSinger, singer_id: int, session: AsyncSession
+    singer_in: UpdateSinger, singer_id: int, session: AsyncSession
 ):
     update_singer = await get_singer_by_id_crud(singer_id=singer_id, session=session)
     if not update_singer:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Певец не найден"
         )
-    singer_data: dict = singer.model_dump(exclude_unset=True)
+    singer_data: dict = singer_in.model_dump(exclude_unset=True)
     if not singer_data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
