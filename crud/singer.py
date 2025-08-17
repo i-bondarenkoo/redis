@@ -51,4 +51,4 @@ async def delete_singer_crud(singer_id: int, session: AsyncSession):
         return None
     await session.delete(singer)
     await session.commit()
-    return {"message": "Запись удалена"}
+    return True

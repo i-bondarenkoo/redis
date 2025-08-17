@@ -3,4 +3,5 @@ from services.redis_service import (
     create_singer_and_cache,
     get_singer_by_id_and_cache,
     update_singer_and_cache,
+    delete_singer_and_cache,
 )

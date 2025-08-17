@@ -48,3 +48,16 @@ async def update_singer_and_cache(
     data = convert_orm_to_dict(update_singer)
     await redis.set(key, json.dumps(data), ex=CACHE_TIME)
     return update_singer
+
+
+async def delete_singer_and_cache(singer_id: int, session: AsyncSession):
+    singer = await crud.delete_singer_crud(singer_id=singer_id, session=session)
+    if singer is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Певец не найден"
+        )
+    else:
+        key = f"singer:{singer_id}"
+        await redis.delete(key)
+        print("Удалили запись из кэша редис")
+    return singer

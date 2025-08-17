@@ -8,6 +8,7 @@ from services.redis_service import (
     create_singer_and_cache,
     get_singer_by_id_and_cache,
     update_singer_and_cache,
+    delete_singer_and_cache,
 )
 
 router = APIRouter(
@@ -70,12 +71,8 @@ async def update_singer_patch(
 
 @router.delete("/{singer_id}")
 async def delete_singer(
-    singer_id: Annotated[int, Path(description="ID Певца для удаления")],
+    singer_id: Annotated[int, Path(gt=0, description="ID Певца для удаления")],
     session: AsyncSession = Depends(get_session),
 ):
-    singer = await crud.delete_singer_crud(singer_id=singer_id, session=session)
-    if singer is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
-        )
-    return singer
+    singer = await delete_singer_and_cache(singer_id=singer_id, session=session)
+    return {"message": "певец удален"}
