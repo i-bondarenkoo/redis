@@ -9,6 +9,7 @@ from services.redis_service import (
     get_singer_by_id_and_cache,
     update_singer_and_cache,
     delete_singer_and_cache,
+    get_list_singers_and_cache,
 )
 
 router = APIRouter(
@@ -53,7 +54,7 @@ async def get_list_singers(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Начальный индекс списка не может быть больше конечного",
         )
-    return await crud.get_list_singer_crud(start=start, stop=stop, session=session)
+    return await get_list_singers_and_cache(start=start, stop=stop, session=session)
 
 
 @router.patch("/{singer_id}", response_model=ResponseSinger)
