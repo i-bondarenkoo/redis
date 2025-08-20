@@ -1,3 +1,4 @@
+from math import e
 import crud
 from db.redis_client import redis
 from schemas.singer import CreateSinger, UpdateSinger
@@ -6,23 +7,36 @@ from fastapi import HTTPException, status
 from services.helpers import convert_orm_to_dict
 import json
 import logging
+from functools import wraps
 
 CACHE_TIME = 180
 # объект который будет писать логику из каждого отдельного файла
 logger = logging.getLogger(__name__)
 
 
+def cache_helper(func):
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        result = await func(*args, **kwargs)
+        try:
+            await clear_cache()
+            logger.info("Очищаем key-value для списка в Redis через декоратор")
+        except Exception as e:
+            logger.error("Не удалось очистить кэш - %s", e)
+        return result
+
+    return wrapper
+
+
+@cache_helper
 async def create_singer_and_cache(singer_in: CreateSinger, session: AsyncSession):
     singer = await crud.create_singer_crud(singer_in=singer_in, session=session)
     singer_to_dict: dict = convert_orm_to_dict(singer)
     key = f"singer:{singer.id}"
+    logger.debug("Сохраняем в Redis ключ - %s", key)
     await redis.set(key, json.dumps(singer_to_dict), ex=CACHE_TIME)
     logger.info(
         "Создали новый ORM-объект в таблице БД и кэшировали его в Redis",
-    )
-    await clear_cache()
-    logger.info(
-        "Очищаем key-value для списка в Redis, тк после изменения он мог устареть",
     )
     # print("Отчистили список объектов из кэша Redis")
     return singer
@@ -30,12 +44,12 @@ async def create_singer_and_cache(singer_in: CreateSinger, session: AsyncSession
 
 async def get_singer_by_id_and_cache(singer_id: int, session: AsyncSession):
     key = f"singer:{singer_id}"
+    logger.debug("Сохраняем в Redis ключ - %s", key)
     cache = await redis.get(key)
     if cache:
         logger.info(
             "GET-запрос на получение объекта по id, берем данные из Redis",
         )
-        # print("взяли данные из redis")
         data: dict = json.loads(cache)
         return data
     singer = await crud.get_singer_by_id_crud(singer_id=singer_id, session=session)
@@ -47,7 +61,6 @@ async def get_singer_by_id_and_cache(singer_id: int, session: AsyncSession):
     logger.info(
         "Кэш пустой, делаем запрос в БД и сохраняем в Redis",
     )
-    # print("Делаем запрос в БД и кэшируем в редис")
     save_to_redis: dict = convert_orm_to_dict(singer)
     await redis.set(key, json.dumps(save_to_redis), ex=CACHE_TIME)
     return singer
@@ -64,19 +77,18 @@ async def get_list_singers_and_cache(
         logger.info(
             "GET-запрос на получение списка объектов, берем данные из Redis",
         )
-        # print("Берем данные для списка из Redis")
         data: list[dict] = json.loads(cache)
         return data
     singer = await crud.get_list_singer_crud(start=start, stop=stop, session=session)
     logger.info(
         "Кэш редис пустой, делаем запрос в БД и сохраняем результат в Redis",
     )
-    # print("Сохраняем данные в Redis")
     save_to_redis: list[dict] = [convert_orm_to_dict(s) for s in singer]
     await redis.set(key, json.dumps(save_to_redis), ex=CACHE_TIME)
     return singer
 
 
+@cache_helper
 async def update_singer_and_cache(
     singer_in: UpdateSinger, singer_id: int, session: AsyncSession
 ):
@@ -87,17 +99,12 @@ async def update_singer_and_cache(
     logger.info(
         "PATCH-запрос, обновляем данные, перезаписываем/сохраняем данные после обновления в Redis",
     )
-    # print("Сохраняем данные в редис")
     data = convert_orm_to_dict(update_singer)
     await redis.set(key, json.dumps(data), ex=CACHE_TIME)
-    await clear_cache()
-    logger.info(
-        "Очищаем key-value для списка в Redis, тк после изменения он мог устареть",
-    )
-    # print("Обновили объект и очистили список в Redis")
     return update_singer
 
 
+@cache_helper
 async def delete_singer_and_cache(singer_id: int, session: AsyncSession):
     singer = await crud.delete_singer_crud(singer_id=singer_id, session=session)
     if singer is None:
@@ -110,12 +117,6 @@ async def delete_singer_and_cache(singer_id: int, session: AsyncSession):
         logger.info(
             "Удалили ORM-объект из БД и запись из кэша Redis",
         )
-        # print("Удалили запись из кэша редис")
-    await clear_cache()
-    logger.info(
-        "Очищаем key-value для списка в Redis, тк после изменения он мог устареть",
-    )
-    # print("Обновили объект и очистили список в Redis")
     return singer
 
 
